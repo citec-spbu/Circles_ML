@@ -205,7 +205,7 @@ def main():
     try:
         results = apply_model_to_images(
             model=model,
-            df_true_coords=df_true_coords,
+            df_true_coords=df,
             image_folder=args.image_folder,
             margin=args.margin,
             target_crop_size=args.crop_size,
