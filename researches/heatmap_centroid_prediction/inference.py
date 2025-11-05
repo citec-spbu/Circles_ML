@@ -33,21 +33,21 @@ def load_and_preprocess_image(image_path):
     image = cv2.GaussianBlur(image, (5, 5), sigmaX=0, sigmaY=0)
     return image
 
-def segment_and_find_regions(img_gray, threshold=60):
-    binary_mask = (img_gray > threshold).astype(np.uint8)
+def segment_and_find_regions(image, threshold=60):
+    binary_mask = (image > threshold).astype(np.uint8)
     labeled_img = label(binary_mask)
     regions = regionprops(labeled_img)
     return regions
 
-def extract_and_process_crop(img_gray, region_bbox, margin=10, target_crop_size=64):
+def extract_and_process_crop(image, region_bbox, margin=10, target_crop_size=64):
     minr, minc, maxr, maxc = region_bbox
 
     minr_margin = max(minr - margin, 0)
     minc_margin = max(minc - margin, 0)
-    maxr_margin = min(maxr + margin, img_gray.shape[0])
-    maxc_margin = min(maxc + margin, img_gray.shape[1])
+    maxr_margin = min(maxr + margin, image.shape[0])
+    maxc_margin = min(maxc + margin, image.shape[1])
 
-    crop_full = img_gray[minr_margin:maxr_margin, minc_margin:maxc_margin]
+    crop_full = image[minr_margin:maxr_margin, minc_margin:maxc_margin]
 
     if crop_full.shape[0] < 35 or crop_full.shape[1] < 35:
         return None
@@ -61,13 +61,13 @@ def extract_and_process_crop(img_gray, region_bbox, margin=10, target_crop_size=
     maxc_crop = minc_crop + target_crop_size
     maxr_crop = minr_crop + target_crop_size
 
-    crop_extract = img_gray[minr_crop:maxr_crop, minc_crop:maxc_crop]
+    crop_extract = image[minr_crop:maxr_crop, minc_crop:maxc_crop]
     crop_extract_norm = crop_extract.astype(np.float32) / 255.0
 
     pad_top = max(0, -minr_crop)
-    pad_bottom = max(0, maxr_crop - img_gray.shape[0])
+    pad_bottom = max(0, maxr_crop - image.shape[0])
     pad_left = max(0, -minc_crop)
-    pad_right = max(0, maxc_crop - img_gray.shape[1])
+    pad_right = max(0, maxc_crop - image.shape[1])
 
     crop_64 = np.pad(crop_extract_norm, ((pad_top, pad_bottom), (pad_left, pad_right)), mode='constant', constant_values=0.0)
 
@@ -108,8 +108,7 @@ def predict_centroid(model, crop_4ch_tensor, device, crop_size=64):
 
     return x_pred_centroid_px, y_pred_centroid_px
 
-def visualize_results(img_gray, results, save_path_prefix="prediction_result"):
-
+def visualize_results(results, save_path_prefix="prediction_result"):
     num_crops = min(len(results), 16)
         
     cols = 4
@@ -168,14 +167,14 @@ def main():
 
     print(f"Загрузка и предобработка '{args.image_path}'")
     try:
-        img_gray = load_and_preprocess_image(args.image_path)
+        image = load_and_preprocess_image(args.image_path)
     except Exception as e:
         print(f"Ошибка во время предобработки: {e}")
         return
 
     print("Поиск пятен")
     try:
-        regions = segment_and_find_regions(img_gray, threshold=args.segmentation_threshold)
+        regions = segment_and_find_regions(image, threshold=args.segmentation_threshold)
     except Exception as e:
         print(f"Ошибка поиска пятен: {e}")
         return
@@ -186,7 +185,7 @@ def main():
         region_bbox = region.bbox
         try:
             crop_data = extract_and_process_crop(
-                img_gray, region_bbox, 
+                image, region_bbox, 
                 margin=args.margin, 
                 target_crop_size=args.target_crop_size
             )
@@ -236,7 +235,7 @@ def main():
         print("Нет результатов")
 
     if results:
-        visualize_results(img_gray, results)
+        visualize_results(results)
     else:
         print("Нет результатов для визуализации")
 
