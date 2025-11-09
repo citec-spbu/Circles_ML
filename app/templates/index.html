@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Детекция центров кругов</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <meta name="description" content="Система для обнаружения центров кругов на изображениях с использованием компьютерного зрения">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🔍 Детекция центров кругов</h1>
+            <p style="text-align: center; color: white; margin-bottom: 30px;">
+                Загрузите изображение и найдите круги
+            </p>
+        </header>
+
+        <!-- Объединенная секция загрузки и конфигурации -->
+        <section class="upload-config-section">
+            <div class="config-grid">
+                <!-- Левая колонка: Загрузка изображения -->
+                <div class="config-column">
+                    <div class="upload-section">
+                        <h3>📁 Загрузка изображения</h3>
+                        <div class="upload-area">
+                            <input type="file" id="imageInput" accept="image/*" class="file-input">
+                            <div style="margin: 20px 0; display: flex; gap: 10px; flex-direction: column;">
+                                <button onclick="detectCenters()">🎯 Найти центры</button>
+                                <!--
+                                <button id="validateBtn" onclick="validateConfiguration()">✅ Проверить конфигурацию</button>
+                                <button id="refreshDetectors" onclick="refreshDetectors()">🔄 Обновить детекторы</button>
+                                -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Правая колонка: Конфигурация детектора -->
+                <div class="config-column">
+                    <div class="config-section">
+                        <h3>⚙️ Конфигурация детектора</h3>
+
+                        <div class="config-group">
+                            <div class="detector-select">
+                                <label for="detectorSelect">Выберите детектор:</label>
+                                <select id="detectorSelect" onchange="onDetectorChange()">
+                                    <option value="">Выберите детектор...</option>
+                                    <!-- Опции будут добавлены JavaScript -->
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="detector-description" id="detectorDescription" style="display: none;">
+                            <strong>Информация о детекторе:</strong>
+                            <span id="detectorInfoText">Информация о выбранном детекторе появится здесь.</span>
+                        </div>
+
+                        <div class="config-group" id="parametersConfig">
+                            <h4>🔧 Параметры детектора</h4>
+                            <div id="parametersList" class="parameters-grid">
+                                <p>Выберите детектор для настройки параметров</p>
+                            </div>
+                            <div class="parameter-hint">
+                                * Обязательные параметры отмечены звездочкой. Оставьте опциональные параметры пустыми для значений по умолчанию.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Секция результатов -->
+        <section class="results">
+            <h3>📊 Результаты</h3>
+            <div class="results-container">
+                <canvas id="resultCanvas" width="800" height="600"></canvas>
+                <div id="resultsInfo">
+                    <p>Результатов пока нет. Загрузите изображение и нажмите "Найти центры".</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Секция информации -->
+        <section class="config-section">
+            <h3>ℹ️ Как использовать</h3>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px;">
+                <div>
+                    <h4>1. Загрузите изображение</h4>
+                    <p>Выберите изображение содержащее круги или круглые маркеры. Поддерживаемые форматы: JPG, PNG, BMP, TIFF.</p>
+                </div>
+                <div>
+                    <h4>2. Выберите детектор</h4>
+                    <p>Выберите подходящий алгоритм детекции из доступных детекторов.</p>
+                </div>
+                <div>
+                    <h4>3. Настройте параметры</h4>
+                    <p>Настройте параметры детектора для лучших результатов. Обязательные параметры отмечены *.</p>
+                </div>
+                <div>
+                    <h4>4. Запустите детекцию</h4>
+                    <p>Нажмите кнопку "Найти центры" и просмотрите результаты с визуализацией кругов и координатами.</p>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <script src="/static/js/script.js"></script>
+</body>
+</html>

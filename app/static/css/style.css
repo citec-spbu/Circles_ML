@@ -1,0 +1,404 @@
+/* Основные стили */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    line-height: 1.6;
+    color: #333;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    min-height: 100vh;
+}
+
+.container {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+/* Заголовок */
+h1 {
+    text-align: center;
+    color: white;
+    margin-bottom: 30px;
+    font-size: 2.5rem;
+    text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+}
+
+h3 {
+    color: #333;
+    margin-bottom: 15px;
+    border-bottom: 2px solid #667eea;
+    padding-bottom: 5px;
+}
+
+h4 {
+    color: #555;
+    margin: 15px 0 10px 0;
+}
+
+/* Новый layout для загрузки и конфигурации */
+.upload-config-section {
+    margin-bottom: 25px;
+}
+
+.config-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 25px;
+    align-items: start;
+}
+
+.config-column {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+}
+
+/* Секции */
+.upload-section {
+    background: white;
+    padding: 25px;
+    border-radius: 15px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+    height: fit-content;
+}
+
+.config-section {
+    background: white;
+    padding: 25px;
+    border-radius: 15px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+    height: fit-content;
+}
+
+.results {
+    background: white;
+    padding: 25px;
+    border-radius: 15px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+    margin-bottom: 25px;
+}
+
+/* Формы и инпуты */
+.detector-select, .config-group {
+    margin-bottom: 20px;
+}
+
+label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: 600;
+    color: #555;
+}
+
+select, input[type="text"], input[type="number"] {
+    width: 100%;
+    padding: 12px;
+    border: 2px solid #e1e5e9;
+    border-radius: 8px;
+    font-size: 14px;
+    transition: all 0.3s ease;
+}
+
+select:focus, input[type="text"]:focus, input[type="number"]:focus {
+    outline: none;
+    border-color: #667eea;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+/* Параметры */
+.parameters-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 15px;
+    margin-top: 10px;
+}
+
+.parameter-item {
+    display: flex;
+    flex-direction: column;
+}
+
+.parameter-item label {
+    font-size: 0.9rem;
+    margin-bottom: 5px;
+}
+
+/* Кнопки */
+button {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border: none;
+    padding: 12px 20px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+    width: 100%;
+}
+
+button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+}
+
+button:active {
+    transform: translateY(0);
+}
+
+button:disabled {
+    background: #ccc;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+}
+
+#validateBtn {
+    background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+}
+
+#refreshDetectors {
+    background: linear-gradient(135deg, #6c757d 0%, #495057 100%);
+}
+
+#imageInput {
+    margin: 20px 0;
+    padding: 15px;
+    border: 2px dashed #667eea;
+    border-radius: 8px;
+    text-align: center;
+    background: #f8f9fa;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    width: 100%;
+}
+
+#imageInput:hover {
+    background: #e9ecef;
+    border-color: #5a67d8;
+}
+
+/* Холст для результатов */
+#resultCanvas {
+    max-width: 100%;
+    border: 2px solid #e1e5e9;
+    border-radius: 8px;
+    margin: 20px 0;
+    display: block;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+}
+
+/* Информация о результатах */
+#resultsInfo {
+    background: #f8f9fa;
+    padding: 20px;
+    border-radius: 8px;
+    border-left: 4px solid #667eea;
+}
+
+.result-item {
+    margin: 10px 0;
+    padding: 10px;
+    background: white;
+    border-radius: 6px;
+    border-left: 3px solid #28a745;
+}
+
+.result-coordinates {
+    font-family: 'Courier New', monospace;
+    background: #e9ecef;
+    padding: 5px 10px;
+    border-radius: 4px;
+    font-size: 0.9rem;
+}
+
+/* Статус загрузки */
+.loading {
+    display: none;
+    text-align: center;
+    padding: 20px;
+}
+
+.spinner {
+    border: 4px solid #f3f3f3;
+    border-top: 4px solid #667eea;
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    animation: spin 1s linear infinite;
+    margin: 0 auto 15px;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* Уведомления */
+.alert {
+    padding: 15px;
+    border-radius: 8px;
+    margin: 15px 0;
+    font-weight: 500;
+}
+
+.alert-success {
+    background: #d4edda;
+    color: #155724;
+    border: 1px solid #c3e6cb;
+}
+
+.alert-error {
+    background: #f8d7da;
+    color: #721c24;
+    border: 1px solid #f5c6cb;
+}
+
+.alert-warning {
+    background: #fff3cd;
+    color: #856404;
+    border: 1px solid #ffeaa7;
+}
+
+/* Стили для информации о детекторе */
+.detector-description {
+    background: #e7f3ff;
+    padding: 15px;
+    border-radius: 8px;
+    margin: 10px 0;
+    border-left: 4px solid #1890ff;
+    font-size: 0.9rem;
+}
+
+.detector-description strong {
+    color: #1890ff;
+}
+
+.detector-description small {
+    color: #6c757d;
+}
+
+.parameter-hint {
+    font-size: 0.8rem;
+    color: #6c757d;
+    margin-top: 10px;
+    font-style: italic;
+}
+
+.stats {
+    display: flex;
+    justify-content: space-around;
+    margin: 20px 0;
+    text-align: center;
+}
+
+.stat-item {
+    padding: 15px;
+}
+
+.stat-value {
+    font-size: 2rem;
+    font-weight: bold;
+    color: #667eea;
+}
+
+.stat-label {
+    font-size: 0.9rem;
+    color: #6c757d;
+    margin-top: 5px;
+}
+
+/* Адаптивность */
+@media (max-width: 1024px) {
+    .config-grid {
+        grid-template-columns: 1fr;
+        gap: 20px;
+    }
+}
+
+@media (max-width: 768px) {
+    .container {
+        padding: 15px;
+    }
+
+    h1 {
+        font-size: 2rem;
+    }
+
+    .upload-section, .config-section, .results {
+        padding: 20px;
+    }
+
+    .parameters-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 480px) {
+    h1 {
+        font-size: 1.8rem;
+    }
+
+    .container {
+        padding: 10px;
+    }
+
+    .upload-section, .config-section, .results {
+        padding: 15px;
+    }
+
+    button {
+        padding: 10px 15px;
+        font-size: 13px;
+    }
+}
+
+
+/* Компактный layout */
+.config-grid {
+    display: grid;
+    grid-template-columns: 300px 1fr;  /* Фиксированная ширина для загрузки, остальное для конфигурации */
+    gap: 25px;
+    align-items: start;
+}
+
+.upload-section {
+    background: white;
+    padding: 20px;
+    border-radius: 15px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+    height: fit-content;
+}
+
+.config-section {
+    background: white;
+    padding: 20px;
+    border-radius: 15px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+    height: fit-content;
+}
+
+/* Кнопки в загрузке компактно */
+.upload-section .button-group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.upload-section button {
+    padding: 10px 15px;
+    font-size: 13px;
+}
+
+/* Параметры занимают всё доступное пространство */
+.parameters-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 12px;
+}

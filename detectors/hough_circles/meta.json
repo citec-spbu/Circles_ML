@@ -1,0 +1,16 @@
+{
+    "name": "Hough Circles Detector",
+    "version": "1.0.0",
+    "class_name": "HoughCirclesDetector",
+    "module_path": "detector",
+    "description": "Обнаружение кругов с помощью преобразования Хафа с субпиксельной точностью",
+    "optional_parameters": {
+        "dp": 1.2,
+        "min_dist": 50,
+        "param1": 100,
+        "param2": 30,
+        "min_radius": 10,
+        "max_radius": 100,
+        "refine_centers": true
+    }
+}
