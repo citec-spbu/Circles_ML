@@ -28,7 +28,7 @@ def gaussian_2d(xy, amplitude, xo, yo, sigma_x, sigma_y, theta, offset):
     c = (np.sin(theta)**2)/(2*sigma_x**2) + (np.cos(theta)**2)/(2*sigma_y**2)
     g = offset + amplitude*np.exp( - (a*((x-xo)**2) + 2*b*(x-xo)*(y-yo) + c*((y-yo)**2)))
     return g.ravel()
-
+    
 def fit_2d_gaussian(crop):
     h, w = crop.shape
     x = np.linspace(0, w - 1, w)
@@ -46,15 +46,17 @@ def fit_2d_gaussian(crop):
     try:
         popt, _ = curve_fit(gaussian_2d, (x, y), crop.ravel(), p0=initial_guess, maxfev=10000)
         xo, yo = popt[1], popt[2]
-        return xo, yo
+        sigma_x, sigma_y = popt[3], popt[4]
+        theta = popt[5]
+        return xo, yo, sigma_x, sigma_y, theta
     except RuntimeError:
         total_intensity = crop.sum()
         if total_intensity == 0:
-            return w / 2.0, h / 2.0
+            return w / 2.0, h / 2.0, 1.0, 1.0, 0.0
         x_indices, y_indices = np.meshgrid(np.arange(w), np.arange(h), indexing='xy')
         x_center = (x_indices * crop).sum() / total_intensity
         y_center = (y_indices * crop).sum() / total_intensity
-        return x_center, y_center
+        return x_center, y_center, 1.0, 1.0, 0.0
     
 def load_and_preprocess_image(image_path):
     img = np.array(Image.open(image_path))
@@ -94,9 +96,32 @@ def extract_and_process_crop(image, region_bbox, margin=10):
         'crop_center_y': crop_center_y
     }
 
-def predict_centroid_gaussian(crop):
-    x_pred, y_pred = fit_2d_gaussian(crop)
-    return x_pred, y_pred
+def predict_centroid_and_normal_gaussian(crop):
+    x_pred, y_pred, sigma_x, sigma_y, theta = fit_2d_gaussian(crop)
+
+    major_axis = max(sigma_x, sigma_y)
+    minor_axis = min(sigma_x, sigma_y)
+
+    aspect_ratio = minor_axis / major_axis if major_axis > 0 else 0.0
+    angle_rad = theta
+    cos_theta = np.clip(aspect_ratio, 0.0, 1.0)
+    theta_normal = np.arccos(cos_theta)
+    phi = angle_rad + np.pi / 2
+
+    nx = np.sin(theta_normal) * np.cos(phi)
+    ny = np.sin(theta_normal) * np.sin(phi)
+    nz = np.cos(theta_normal)
+
+    norm_length = np.sqrt(nx**2 + ny**2 + nz**2)
+    if norm_length > 0:
+        nx /= norm_length
+        ny /= norm_length
+        nz /= norm_length
+    else:
+        print("Краевой случай, длина 0. Вернем (0, 0, 1)")
+        return x_pred, y_pred, 0.0, 0.0, 1.0
+
+    return x_pred, y_pred, nx, ny, nz
 
 def visualize_results(results, save_path_prefix="gaussian_prediction_result"):
     num_crops = min(len(results), 16)
@@ -119,6 +144,12 @@ def visualize_results(results, save_path_prefix="gaussian_prediction_result"):
         x_pred_in_crop_norm = res['pred_x_centroid_crop_norm']
         y_pred_in_crop_norm = res['pred_y_centroid_crop_norm']
         ax.plot(x_pred_in_crop_norm, y_pred_in_crop_norm, 'bo', markersize=3)
+
+        scale_arrow = 10
+        if res['normal_x'] is not None and res['normal_y'] is not None:
+            arrow_dx = res['normal_x'] * scale_arrow
+            arrow_dy = res['normal_y'] * scale_arrow
+            ax.arrow(x_pred_in_crop_norm, y_pred_in_crop_norm, arrow_dx, arrow_dy, head_width=1, head_length=1, fc='red', ec='red', label='Normal')
 
     for j in range(num_crops, len(axes)):
         axes[j].axis('off')
@@ -161,12 +192,12 @@ def main():
         if crop_data is None:
             continue
 
-        x_pred_crop_norm, y_pred_crop_norm = predict_centroid_gaussian(crop_data['crop_full_norm'])
+        x_pred_crop_norm, y_pred_crop_norm, nx, ny, nz = predict_centroid_and_normal_gaussian(crop_data['crop_full_norm'])
 
         x_pred_img = x_pred_crop_norm + crop_data['minc_crop']
         y_pred_img = y_pred_crop_norm + crop_data['minr_crop']
 
-        print(f"Пятно {i+1}: центр предсказан в ({x_pred_img:.2f}, {y_pred_img:.2f})")
+        print(f"Пятно {i+1}: центр предсказан в ({x_pred_img:.2f}, {y_pred_img:.2f}), Нормаль=({nx:.4f}, {ny:.4f}, {nz:.4f})")
 
         results.append({
             'pred_x_img': x_pred_img,
@@ -178,12 +209,15 @@ def main():
             'crop_center_y': crop_data['crop_center_y'],
             'pred_x_centroid_crop_norm': x_pred_crop_norm,
             'pred_y_centroid_crop_norm': y_pred_crop_norm,
+            'normal_x': nx,
+            'normal_y': ny,
+            'normal_z': nz
         })
 
     print("\n Результаты")
     if results:
         for i, res in enumerate(results):
-            print(f"Пятно {i+1}: ({res['pred_x_img']:.6f}, {res['pred_y_img']:.6f})")
+            print(f"Пятно {i+1}: ({res['pred_x_img']:.6f}, {res['pred_y_img']:.6f}), Нормаль=({res['normal_x']:.6f}, {res['normal_y']:.6f}, {res['normal_z']:.6f})")
     else:
         print("Нет результатов")
 

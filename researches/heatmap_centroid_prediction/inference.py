@@ -10,6 +10,73 @@ from tqdm import tqdm
 
 from src.model import UNetHeatmapModel
 
+def estimate_normal_from_spot(img_spot, plot_ellipse=False):
+
+    img_to_thresh = img_spot
+    if img_to_thresh.max() <= 1.0:
+        img_to_thresh = img_to_thresh * 255.0
+    img_to_thresh = np.clip(img_to_thresh, 0, 255).astype(np.uint8)
+    _, binary_mask = cv2.threshold(img_to_thresh, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+    contours, _ = cv2.findContours(binary_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+    if not contours:
+        print("Контуров пятна не найдено")
+        return None, None, None
+
+    largest_contour = max(contours, key=cv2.contourArea)
+
+    if len(largest_contour) < 5:
+        print(f"Контур слишком короткий: ({len(largest_contour)})")
+        return None, None, None
+
+    try:
+        ellipse = cv2.fitEllipse(largest_contour)
+        (center_x, center_y), (axis_a, axis_b), angle_deg = ellipse
+    except cv2.error as e:
+        print(f"Ошибка при построении эллипса: {e}")
+        return None, None, None
+
+    major_axis = max(axis_a, axis_b)
+    minor_axis = min(axis_a, axis_b)
+
+    aspect_ratio = minor_axis / major_axis if major_axis > 0 else 0.0
+
+    angle_rad = np.deg2rad(angle_deg)
+
+    cos_theta = np.clip(aspect_ratio, 0.0, 1.0)
+    theta = np.arccos(cos_theta)
+    phi = angle_rad + np.pi / 2
+
+    nx = np.sin(theta) * np.cos(phi)
+    ny = np.sin(theta) * np.sin(phi)
+    nz = np.cos(theta)
+
+    norm_length = np.sqrt(nx**2 + ny**2 + nz**2)
+    if norm_length > 0:
+        nx /= norm_length
+        ny /= norm_length
+        nz /= norm_length
+    else:
+        print("Краевой случай, длина 0. Вернем (0, 0, 1)")
+        return 0.0, 0.0, 1.0
+
+    if plot_ellipse:
+        plt.figure(figsize=(10, 5))
+        plt.subplot(1, 2, 1)
+        plt.imshow(img_spot, cmap='gray')
+        plt.title("Ориганал")
+        plt.axis('off')
+
+        plt.subplot(1, 2, 2)
+        plt.imshow(binary_mask, cmap='gray')
+        cv2.ellipse(binary_mask, ellipse, color=255, thickness=1)
+        plt.imshow(binary_mask, cmap='gray')
+        plt.title(f"Найденный эллипс\nОтношение осей: {aspect_ratio:.3f}, Угол: {angle_deg:.1f} градусов")
+        plt.axis('off')
+        plt.show()
+
+    return nx, ny, nz
+
 def parse_args():
     parser = argparse.ArgumentParser(description="Инференс одного изображения")
     
@@ -135,6 +202,12 @@ def visualize_results(results, save_path_prefix="prediction_result"):
         y_pred_px_in_crop = res['pred_y_centroid_px']
         ax.plot(x_pred_px_in_crop, y_pred_px_in_crop, 'bo', markersize=3)
 
+        scale_arrow = 10
+        if res['normal_x'] is not None and res['normal_y'] is not None:
+            arrow_dx = res['normal_x'] * scale_arrow
+            arrow_dy = res['normal_y'] * scale_arrow
+            ax.arrow(x_pred_px_in_crop, y_pred_px_in_crop, arrow_dx, arrow_dy, head_width=2, head_length=2, fc='red', ec='red', label='Normal')
+
     for j in range(num_crops, len(axes)):
         axes[j].axis('off')
 
@@ -215,6 +288,9 @@ def main():
 
         print(f"Пятно {i+1}: центр предсказан в ({x_pred_img:.2f}, {y_pred_img:.2f})")
 
+        crop_for_normal = crop_data['crop_64_visual']
+        nx, ny, nz = estimate_normal_from_spot(img_spot=crop_for_normal, plot_ellipse=False)
+
         results.append({
             'pred_x_img': x_pred_img,
             'pred_y_img': y_pred_img,
@@ -225,12 +301,18 @@ def main():
             'crop_center_y': crop_data['crop_center_y'],
             'pred_x_centroid_px': x_pred_centroid_px,
             'pred_y_centroid_px': y_pred_centroid_px,
+            'normal_x': nx,
+            'normal_y': ny,
+            'normal_z': nz
         })
 
     print("\n Результаты")
     if results:
         for i, res in enumerate(results):
-            print(f"Пятно {i+1}: ({res['pred_x_img']:.6f}, {res['pred_y_img']:.6f})")
+            if res['normal_x'] is not None:
+                print(f"Пятно {i+1}: ({res['pred_x_img']:.6f}, {res['pred_y_img']:.6f}), Нормаль=({res['normal_x']:.6f}, {res['normal_y']:.6f}, {res['normal_z']:.6f})")
+            else:
+                print(f"Пятно {i+1}: ({res['pred_x_img']:.6f}, {res['pred_y_img']:.6f}), Нормаль=не удалось оценить")
     else:
         print("Нет результатов")
 
