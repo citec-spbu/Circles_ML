@@ -1,0 +1,13 @@
+{
+    "name": "UNet Heatmap Detector",
+    "version": "1.0.0",
+    "class_name": "UNetHeatmapDetector",
+    "module_path": "detector",
+    "description": "Обнаружение центров пятен с помощью UNet, предсказывающей heatmap, и оценки нормали по форме пятна",
+    "optional_parameters": {
+        "model_path": "models/unet_heatmap_model.pth",
+        "margin": 10,
+        "target_crop_size": 64,
+        "segmentation_threshold": 60
+    }
+}
