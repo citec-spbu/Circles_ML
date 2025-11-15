@@ -1,0 +1,11 @@
+{
+    "name": "Gaussian Fitter Detector",
+    "version": "1.0.0",
+    "class_name": "GaussianFitterDetector",
+    "module_path": "detector",
+    "description": "Обнаружение центров пятен и оценка нормали путем подгонки 2D гауссианы",
+    "optional_parameters": {
+        "margin": 10,
+        "segmentation_threshold": 60
+    }
+}
