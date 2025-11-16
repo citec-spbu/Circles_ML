@@ -117,7 +117,12 @@ class GaussianFitterDetector(BaseDetector):
         margin = self.config.get('margin', 10)
         segmentation_threshold = self.config.get('segmentation_threshold', 60)
 
-        image = cv2.GaussianBlur(image, (5, 5), sigmaX=0, sigmaY=0)
+        if len(image.shape) == 3:
+            gray_image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY).astype(np.float32)
+        else:
+            gray_image = image.astype(np.float32)
+
+        image = cv2.GaussianBlur(gray_image, (5, 5), sigmaX=0, sigmaY=0)
 
         try:
             regions = segment_and_find_regions(image, threshold=segmentation_threshold)
