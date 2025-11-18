@@ -9,17 +9,14 @@ class BlindMarkerDetector(BaseDetector):
     """
     Cлепой детектор двух круговых меток.
     """
-
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.min_area = self.config.get("min_area", 200)
         self.max_area = self.config.get("max_area", 40000)
         self.min_distance = self.config.get("min_distance_between_markers", 80)
-        self.global_thresh_factor = self.config.get("global_thresh_factor", 0.31)
-        self.local_roi_size = self.config.get("local_roi_size", 140)
+        self.global_thresh_factor = self.config.get("global_thresh_factor", 0.24)
+        self.local_roi_size = self.config.get("local_roi_size", 250)
         self.min_score_threshold = self.config.get("min_score_threshold", 12.0)
-
-        
 
     def _candidate_score(self, cnt, image):
         area = cv2.contourArea(cnt)
@@ -131,8 +128,8 @@ class BlindMarkerDetector(BaseDetector):
         # === 2. Защита от провала (слишком близкие центры) ===
         if len(selected) == 2:
             d = np.hypot(selected[0][0] - selected[1][0], selected[0][1] - selected[1][1])
-            if d < self.min_distance * 0.9:  # почти наверняка ошибка
-                selected = []  # сбрасываем и идём в зональный поиск
+            if d < self.min_distance * 0.9:
+                selected = []
 
         # === 3. Зональный поиск (углы + центр), если глобальный провалился ===
         if len(selected) < 2:
