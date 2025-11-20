@@ -33,8 +33,9 @@ def parse_args():
 
     return parser.parse_args()
 
-def load_model(model_path, config_path, device):
+def load_model_and_config(model_path, config_path, device):
     model_params = {}
+    eval_params = {}
     if config_path and os.path.exists(config_path):
         try:
             with open(config_path, 'r') as f:
@@ -45,10 +46,19 @@ def load_model(model_path, config_path, device):
                 'dropout_p': train_config.get('dropout_p', 0.0),
             }
             print(f"Параметры загружены: {model_params}")
+            eval_params = {
+                'margin': train_config.get('margin', 10),
+                'target_crop_size': train_config.get('target_crop_size', 64)
+            }
+            print(f"Параметры оценки загружены: {eval_params}")
         except Exception as e:
             print(f"Ошибка загрузки параметров '{config_path}': {e}")
+            model_params = {'crop_size': 64, 'heatmap_size': 64, 'dropout_p': 0.0}
+            eval_params = {'margin': 10, 'target_crop_size': 64}
     else:
-        print("Файл конфигурации отсутствует")
+        print("Файл конфигурации отсутствует, используются значения по умолчанию")
+        model_params = {'crop_size': 64, 'heatmap_size': 64, 'dropout_p': 0.0}
+        eval_params = {'margin': 10, 'target_crop_size': 64}
         
     model = UNetHeatmapModel(**model_params)
     
@@ -57,7 +67,7 @@ def load_model(model_path, config_path, device):
         model.load_state_dict(torch.load(model_path, map_location=device))
         model.to(device)
         model.eval()
-        return model
+        return model, eval_params
     except Exception as e:
         print(f"Ошибка при загрузке весов: {e}")
         raise
@@ -135,8 +145,8 @@ def apply_model_to_images(model, df_true_coords, image_folder, margin, target_cr
                 heatmap_pred = model(crop_tensor)
 
             H, W = heatmap_pred.shape[-2], heatmap_pred.shape[-1]
-            x_coords = torch.arange(W, dtype=torch.float64, device=device) / (W - 1)
-            y_coords = torch.arange(H, dtype=torch.float64, device=device) / (H - 1)
+            x_coords = torch.arange(W, dtype=torch.float64, device=device) #/ (W - 1)
+            y_coords = torch.arange(H, dtype=torch.float64, device=device) #/ (H - 1)
             X_coords, Y_coords = torch.meshgrid(x_coords, y_coords, indexing='xy')
 
             heatmap_flat_f64 = heatmap_pred.squeeze(1).flatten(start_dim=1).double()
@@ -197,18 +207,21 @@ def main():
             else:
                 print("Не обнаружено файла конфигурации")
 
-        model = load_model(args.model_path, args.config_path, device)
+        model, eval_params = load_model_and_config(args.model_path, args.config_path, device)
     except Exception as e:
         print(f"Ошибка загрузки модели: {e}")
         return
+    
+    margin = eval_params.get('margin', 10)
+    target_crop_size = eval_params.get('target_crop_size', 64)
 
     try:
         results = apply_model_to_images(
             model=model,
             df_true_coords=df,
             image_folder=args.image_folder,
-            margin=args.margin,
-            target_crop_size=args.crop_size,
+            margin=margin,
+            target_crop_size=target_crop_size,
             device=device
         )
         print(f"Получено {len(results)} результатов.")
@@ -222,10 +235,27 @@ def main():
         median_error = np.median(errors)
         std_error = np.std(errors)
 
+        rmse = np.sqrt(np.mean(errors**2))
+        true_x_vals = np.array([r['true_x'] for r in results])
+        true_y_vals = np.array([r['true_y'] for r in results])
+        pred_x_vals = np.array([r['pred_x'] for r in results])
+        pred_y_vals = np.array([r['pred_y'] for r in results])
+        true_vals = np.concatenate([true_x_vals, true_y_vals])
+        pred_vals = np.concatenate([pred_x_vals, pred_y_vals])
+
+        from sklearn.metrics import mean_absolute_error, r2_score
+        mae_x = mean_absolute_error(true_x_vals, pred_x_vals)
+        mae_y = mean_absolute_error(true_y_vals, pred_y_vals)
+        r2 = r2_score(true_vals, pred_vals)
+
         print("\n" + "="*40)
         print(f"Средняя ошибка: {avg_error:.4f}")
         print(f"Медианная ошибка: {median_error:.4f}")
         print(f"Стандартное отклонение ошибок: {std_error:.4f}")
+        print(f"RMSE: {rmse:.4f}")
+        print(f"MAE (X): {mae_x:.4f}")
+        print(f"MAE (Y): {mae_y:.4f}")
+        print(f"R2 Score: {r2:.10f}")
         print("="*40)
 
         print("\nТоп-10 самых больших ошибок")
