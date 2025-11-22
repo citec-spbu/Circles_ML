@@ -1,4 +1,3 @@
-// Основной класс приложения
 class CircleDetectionApp {
     constructor() {
         this.canvas = document.getElementById('resultCanvas');
@@ -14,6 +13,11 @@ class CircleDetectionApp {
         this.detectionResults = [];
         this.availableDetectors = [];
         this.currentScale = 1;
+        this.zoomLevel = 1;
+        this.panOffset = { x: 0, y: 0 };
+        this.isDragging = false;
+        this.lastPanPoint = { x: 0, y: 0 };
+        this.originalImageSize = { width: 0, height: 0 };
 
         this.init();
     }
@@ -35,15 +39,191 @@ class CircleDetectionApp {
             this.onDetectorChange();
         });
 
-        // // Кнопка валидации
-        // document.getElementById('validateBtn').addEventListener('click', () => {
-        //     this.validateConfiguration();
-        // });
-        //
-        // // Кнопка обновления списка детекторов
-        // document.getElementById('refreshDetectors').addEventListener('click', () => {
-        //     this.refreshDetectors();
-        // });
+        // Обработчики для зума и панорамирования
+        this.setupZoomHandlers();
+    }
+
+    setupZoomHandlers() {
+        // Колесико мыши для зума
+        this.canvas.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            this.handleZoom(e);
+        });
+
+        // Перетаскивание для панорамирования
+        this.canvas.addEventListener('mousedown', (e) => {
+            this.startPan(e);
+        });
+
+        this.canvas.addEventListener('mousemove', (e) => {
+            this.doPan(e);
+        });
+
+        this.canvas.addEventListener('mouseup', () => {
+            this.endPan();
+        });
+
+        this.canvas.addEventListener('mouseleave', () => {
+            this.endPan();
+        });
+
+        // Сенсорные события для мобильных устройств
+        this.canvas.addEventListener('touchstart', (e) => {
+            if (e.touches.length === 1) {
+                this.startPan(e.touches[0]);
+            }
+        });
+
+        this.canvas.addEventListener('touchmove', (e) => {
+            if (e.touches.length === 1) {
+                this.doPan(e.touches[0]);
+            }
+        });
+
+        this.canvas.addEventListener('touchend', () => {
+            this.endPan();
+        });
+
+        // Кнопки управления зумом
+        const zoomInBtn = document.getElementById('zoomIn');
+        const zoomOutBtn = document.getElementById('zoomOut');
+        const resetViewBtn = document.getElementById('resetView');
+
+        if (zoomInBtn) {
+            zoomInBtn.addEventListener('click', () => {
+                this.zoomAtCenter(1.2);
+            });
+        }
+
+        if (zoomOutBtn) {
+            zoomOutBtn.addEventListener('click', () => {
+                this.zoomAtCenter(0.8);
+            });
+        }
+
+        if (resetViewBtn) {
+            resetViewBtn.addEventListener('click', () => {
+                this.resetView();
+            });
+        }
+    }
+
+    handleZoom(e) {
+        const rect = this.canvas.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+
+        const zoomFactor = e.deltaY > 0 ? 0.8 : 1.2;
+        this.zoomAtPoint(x, y, zoomFactor);
+    }
+
+    zoomAtPoint(x, y, zoomFactor) {
+        const newZoom = this.zoomLevel * zoomFactor;
+        const minZoom = 0.1;
+        const maxZoom = 10;
+
+        if (newZoom < minZoom || newZoom > maxZoom) return;
+
+        // Вычисляем смещение для сохранения точки под курсором
+        const worldX = (x - this.panOffset.x) / this.zoomLevel;
+        const worldY = (y - this.panOffset.y) / this.zoomLevel;
+
+        this.zoomLevel = newZoom;
+
+        // Обновляем смещение для сохранения точки под курсором
+        this.panOffset.x = x - worldX * this.zoomLevel;
+        this.panOffset.y = y - worldY * this.zoomLevel;
+
+        this.redrawCanvas();
+    }
+
+    zoomAtCenter(zoomFactor) {
+        const centerX = this.canvas.width / 2;
+        const centerY = this.canvas.height / 2;
+        this.zoomAtPoint(centerX, centerY, zoomFactor);
+    }
+
+    startPan(e) {
+        this.isDragging = true;
+        this.lastPanPoint = { x: e.clientX, y: e.clientY };
+        this.canvas.style.cursor = 'grabbing';
+    }
+
+    doPan(e) {
+        if (!this.isDragging) return;
+
+        const dx = e.clientX - this.lastPanPoint.x;
+        const dy = e.clientY - this.lastPanPoint.y;
+
+        this.panOffset.x += dx;
+        this.panOffset.y += dy;
+
+        this.lastPanPoint = { x: e.clientX, y: e.clientY };
+        this.redrawCanvas();
+    }
+
+    endPan() {
+        this.isDragging = false;
+        this.canvas.style.cursor = 'grab';
+    }
+
+    resetView() {
+        if (!this.currentImage) return;
+
+        // Рассчитываем масштаб для полного отображения изображения
+        const canvasAspect = this.canvas.width / this.canvas.height;
+        const imageAspect = this.originalImageSize.width / this.originalImageSize.height;
+
+        let scale;
+        if (imageAspect > canvasAspect) {
+            // Изображение шире canvas
+            scale = this.canvas.width / this.originalImageSize.width;
+        } else {
+            // Изображение выше canvas
+            scale = this.canvas.height / this.originalImageSize.height;
+        }
+
+        this.zoomLevel = scale;
+
+        // Центрируем изображение
+        const scaledWidth = this.originalImageSize.width * scale;
+        const scaledHeight = this.originalImageSize.height * scale;
+        this.panOffset.x = (this.canvas.width - scaledWidth) / 2;
+        this.panOffset.y = (this.canvas.height - scaledHeight) / 2;
+
+        this.redrawCanvas();
+    }
+
+    redrawCanvas() {
+        if (!this.currentImage) return;
+
+        this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+
+        // Сохраняем контекст
+        this.ctx.save();
+
+        // Применяем трансформации
+        this.ctx.translate(this.panOffset.x, this.panOffset.y);
+        this.ctx.scale(this.zoomLevel, this.zoomLevel);
+
+        // Рисуем оригинальное изображение (без масштабирования для отображения)
+        this.ctx.drawImage(this.currentImage, 0, 0, this.originalImageSize.width, this.originalImageSize.height);
+
+        // Рисуем результаты детекции
+        this.drawDetectionResults();
+
+        // Восстанавливаем контекст
+        this.ctx.restore();
+
+        // Обновляем информацию о зуме
+        this.updateZoomInfo();
+    }
+
+    updateZoomInfo() {
+        const zoomInfo = document.getElementById('zoomInfo');
+        if (zoomInfo) {
+            zoomInfo.textContent = `Масштаб: ${(this.zoomLevel * 100).toFixed(0)}%`;
+        }
     }
 
     async refreshDetectors() {
@@ -226,18 +406,32 @@ class CircleDetectionApp {
         img.onload = () => {
             // Сохраняем оригинальное изображение для обработки
             this.currentImage = img;
+            this.originalImageSize = { width: img.width, height: img.height };
 
-            // Для отображения используем уменьшенную версию (если нужно)
-            const maxDisplayWidth = 800;
-            const scale = Math.min(maxDisplayWidth / img.width, 1);
-            this.currentScale = scale;
+            // Устанавливаем размер canvas под изображение (с ограничением по максимальному размеру)
+            const maxCanvasWidth = 1200;
+            const maxCanvasHeight = 800;
 
-            this.canvas.width = img.width * scale;
-            this.canvas.height = img.height * scale;
+            let canvasWidth = img.width;
+            let canvasHeight = img.height;
 
-            // Рисуем уменьшенную версию для отображения
-            this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-            this.ctx.drawImage(img, 0, 0, this.canvas.width, this.canvas.height);
+            if (canvasWidth > maxCanvasWidth) {
+                const ratio = maxCanvasWidth / canvasWidth;
+                canvasWidth = maxCanvasWidth;
+                canvasHeight = canvasHeight * ratio;
+            }
+
+            if (canvasHeight > maxCanvasHeight) {
+                const ratio = maxCanvasHeight / canvasHeight;
+                canvasHeight = maxCanvasHeight;
+                canvasWidth = canvasWidth * ratio;
+            }
+
+            this.canvas.width = canvasWidth;
+            this.canvas.height = canvasHeight;
+
+            // Сбрасываем трансформации и устанавливаем вид по умолчанию
+            this.resetView();
 
             this.detectionResults = [];
             this.clearResults();
@@ -331,8 +525,8 @@ class CircleDetectionApp {
     handleDetectionResult(result) {
         this.detectionResults = result.centers;
 
-        // Рисуем результаты на canvas с учетом масштаба
-        this.drawDetectionResults();
+        // Перерисовываем canvas с результатами
+        this.redrawCanvas();
 
         // Показываем информацию
         this.displayResultsInfo(result);
@@ -346,40 +540,41 @@ class CircleDetectionApp {
     }
 
     drawDetectionResults() {
-        if (!this.currentImage || !this.detectionResults.length) return;
+        if (!this.detectionResults.length) return;
 
-        // Перерисовываем изображение
-        this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-        this.ctx.drawImage(this.currentImage, 0, 0, this.canvas.width, this.canvas.height);
-
-        // Рисуем центры и круги с учетом масштаба
+        // Рисуем результаты в координатах оригинального изображения
         this.detectionResults.forEach((center, index) => {
-            const x = center.center_x * this.currentScale;
-            const y = center.center_y * this.currentScale;
-            const radius = center.radius ? center.radius * this.currentScale : 5;
+            const x = center.center_x;
+            const y = center.center_y;
+            const radius = center.radius || 5;
+
+            // Адаптируем размер элементов к текущему зуму
+            const lineWidth = Math.max(1, 2 / this.zoomLevel);
+            const pointSize = Math.max(2, 3 / this.zoomLevel);
+            const fontSize = Math.max(8, 14 / this.zoomLevel);
 
             // Рисуем круг
             this.ctx.beginPath();
             this.ctx.arc(x, y, radius, 0, 2 * Math.PI);
             this.ctx.strokeStyle = '#ff0000';
-            this.ctx.lineWidth = 2;
+            this.ctx.lineWidth = lineWidth;
             this.ctx.stroke();
 
             // Рисуем центр
             this.ctx.beginPath();
-            this.ctx.arc(x, y, 3, 0, 2 * Math.PI);
+            this.ctx.arc(x, y, pointSize, 0, 2 * Math.PI);
             this.ctx.fillStyle = '#00ff00';
             this.ctx.fill();
 
             // Номер центра
             this.ctx.fillStyle = '#0000ff';
-            this.ctx.font = '14px Arial';
-            this.ctx.fillText(`${index + 1}`, x + 8, y - 8);
+            this.ctx.font = `${fontSize}px Arial`;
+            this.ctx.fillText(`${index + 1}`, x + 8 / this.zoomLevel, y - 8 / this.zoomLevel);
 
             // Нормаль (если есть и не нулевая)
             if ((center.normal_x !== 0 || center.normal_y !== 0) &&
                 !isNaN(center.normal_x) && !isNaN(center.normal_y)) {
-                const normalLength = 20;
+                const normalLength = 20 / this.zoomLevel;
                 this.ctx.beginPath();
                 this.ctx.moveTo(x, y);
                 this.ctx.lineTo(
@@ -387,7 +582,7 @@ class CircleDetectionApp {
                     y + center.normal_y * normalLength
                 );
                 this.ctx.strokeStyle = '#0000ff';
-                this.ctx.lineWidth = 1;
+                this.ctx.lineWidth = lineWidth / 2;
                 this.ctx.stroke();
             }
         });
@@ -453,11 +648,11 @@ class CircleDetectionApp {
 
         if (show) {
             button.disabled = true;
-            // validateBtn.disabled = true;
+            if (validateBtn) validateBtn.disabled = true;
             button.textContent = 'Обработка...';
         } else {
             button.disabled = false;
-            // validateBtn.disabled = false;
+            if (validateBtn) validateBtn.disabled = false;
             button.textContent = 'Найти центры';
         }
     }
@@ -472,7 +667,11 @@ class CircleDetectionApp {
         alert.textContent = message;
 
         // Вставляем перед контейнером
-        document.querySelector('.container').insertBefore(alert, document.querySelector('.upload-config-section'));
+        const uploadConfigSection = document.querySelector('.upload-config-section');
+        const container = document.querySelector('.container');
+        if (uploadConfigSection && container) {
+            container.insertBefore(alert, uploadConfigSection);
+        }
 
         // Автоматически удаляем через 5 секунд
         setTimeout(() => {
