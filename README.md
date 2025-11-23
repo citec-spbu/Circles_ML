@@ -56,3 +56,17 @@ python researches/heatmap_centroid_prediction/evaluation.py --data_csv PATH_TO_Y
 ```bash
 python researches/heatmap_centroid_prediction/inference.py --image_path PATH_TO_YOUR_IMAGE
 ```
+
+### Метод нахождения через контуры
+**Запуск алгоритма для одного изображения:**
+
+```bash
+python researches/circles.py --image_path PATH_TO_YOUR_IMAGE
+```
+
+
+**Запуск алгоритма для серии изображений:**
+
+```bash
+python researches/circles.py --image_path PATH_TO_YOUR_IMAGE_FOLDER
+```
