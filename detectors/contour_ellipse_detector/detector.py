@@ -13,7 +13,7 @@ class ContourEllipseDetector(BaseDetector):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.min_area = self.config.get("min_area", 100)
+        self.min_area = self.config.get("min_area", 25)
         self.max_area = self.config.get("max_area", 50000)
         self.circularity_threshold = self.config.get("circularity_threshold", 0.3)
         self.ellipse_aspect_ratio_max = self.config.get("ellipse_aspect_ratio_max", 2.0)
@@ -60,7 +60,7 @@ class ContourEllipseDetector(BaseDetector):
         refined_y = y_min + max_y / zoom_factor
 
         return refined_x, refined_y
-
+    
     def _refine_marker_center(self, gray: np.ndarray, contour: np.ndarray, approx_center: tuple) -> tuple:
         """Уточнение центра маркера с субпиксельной точностью"""
         M = cv2.moments(contour)
@@ -73,22 +73,36 @@ class ContourEllipseDetector(BaseDetector):
         if not self.refine_centers:
             return cx, cy
 
-        center_array = np.array([[cx, cy]], dtype=np.float32)
-        criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 30, 0.01)
-
-        gray_float = np.float32(gray)
-        harris_dst = cv2.cornerHarris(gray_float, 2, 3, 0.04)
-        harris_norm = cv2.normalize(harris_dst, None, 0, 255, cv2.NORM_MINMAX).astype(np.uint8)
-
-        center_array = center_array.reshape(-1, 1, 2)
-        cv2.cornerSubPix(harris_norm, center_array, (10, 10), (-1, -1), criteria)
-
-        refined_cx, refined_cy = center_array[0, 0]
-
-        if abs(refined_cx - cx) > self.max_center_shift or abs(refined_cy - cy) > self.max_center_shift:
+        x, y, w, h = cv2.boundingRect(contour)
+        margin = 15
+        roi_x = max(0, x - margin)
+        roi_y = max(0, y - margin)
+        roi_w = min(gray.shape[1] - roi_x, w + 2 * margin)
+        roi_h = min(gray.shape[0] - roi_y, h + 2 * margin)
+        
+        roi = gray[roi_y:roi_y + roi_h, roi_x:roi_x + roi_w]
+        
+        offset_x, offset_y = roi_x, roi_y
+        
+        center_in_roi = np.array([[[cx - offset_x, cy - offset_y]]], dtype=np.float32)
+        criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 20, 0.01)
+        
+        try:
+            gray_roi_float = np.float32(roi)
+            harris_dst = cv2.cornerHarris(gray_roi_float, 2, 3, 0.04)
+            harris_norm = cv2.normalize(harris_dst, None, 0, 255, cv2.NORM_MINMAX).astype(np.uint8)
+            
+            cv2.cornerSubPix(harris_norm, center_in_roi, (10, 10), (-1, -1), criteria)
+            
+            refined_cx = center_in_roi[0, 0, 0] + offset_x
+            refined_cy = center_in_roi[0, 0, 1] + offset_y
+            
+            if abs(refined_cx - cx) <= self.max_center_shift and abs(refined_cy - cy) <= self.max_center_shift:
+                return refined_cx, refined_cy
+            else:
+                return cx, cy
+        except:
             return cx, cy
-
-        return refined_cx, refined_cy
 
     def _calculate_confidence(self, area: float, circularity: float, aspect_ratio: float, contour_points: int) -> float:
         """Вычисление уверенности в обнаружении маркера"""
@@ -107,14 +121,13 @@ class ContourEllipseDetector(BaseDetector):
         """Основной метод детекции маркеров"""
         
         if len(image.shape) == 3:
-            gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+            gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY).astype(np.uint8)
         else:
             gray = image.astype(np.uint8)
 
         binary = self._advanced_binarization(gray)
         
         contours, _ = cv2.findContours(binary, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-        
         results = []
         
         for contour in contours:

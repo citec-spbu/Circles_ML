@@ -5,7 +5,7 @@
     "module_path": "contour_ellipse_detector",
     "description": "Обнаружение белых круговых меток на основе контурного анализа с аппроксимацией эллипсами и субпиксельным уточнением центров",
     "optional_parameters": {
-        "min_area": 100,
+        "min_area": 25,
         "max_area": 50000,
         "circularity_threshold": 0.3,
         "ellipse_aspect_ratio_max": 2.0,

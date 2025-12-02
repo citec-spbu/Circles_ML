@@ -5,7 +5,7 @@ import os
 import sys
 from typing import List, Dict, Tuple
 
-MIN_AREA = 100
+MIN_AREA = 25
 MAX_AREA = 50000
 CIRCULARITY_THRESHOLD = 0.3
 ELLIPSE_ASPECT_RATIO_MAX = 2.0
@@ -54,23 +54,37 @@ def refine_marker_center(gray: np.ndarray, contour: np.ndarray, approx_center: T
     else:
         cx, cy = approx_center
 
-    center_array = np.array([[cx, cy]], dtype=np.float32)
-    criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 30, 0.01)
-
-    gray_float = np.float32(gray)
-    harris_dst = cv2.cornerHarris(gray_float, 2, 3, 0.04)
-    harris_norm = cv2.normalize(harris_dst, None, 0, 255, cv2.NORM_MINMAX).astype(np.uint8)
-
-    center_array = center_array.reshape(-1, 1, 2)
-    cv2.cornerSubPix(harris_norm, center_array, (10, 10), (-1, -1), criteria)
-
-    refined_cx, refined_cy = center_array[0, 0]
-
-    max_shift = 2
-    if abs(refined_cx - cx) > max_shift or abs(refined_cy - cy) > max_shift:
+    x, y, w, h = cv2.boundingRect(contour)
+    margin = 15
+    roi_x = max(0, x - margin)
+    roi_y = max(0, y - margin)
+    roi_w = min(gray.shape[1] - roi_x, w + 2 * margin)
+    roi_h = min(gray.shape[0] - roi_y, h + 2 * margin)
+    
+    roi = gray[roi_y:roi_y + roi_h, roi_x:roi_x + roi_w]
+    
+    offset_x, offset_y = roi_x, roi_y
+    
+    center_in_roi = np.array([[[cx - offset_x, cy - offset_y]]], dtype=np.float32)
+    criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 20, 0.01)
+    
+    try:
+        gray_roi_float = np.float32(roi)
+        harris_dst = cv2.cornerHarris(gray_roi_float, 2, 3, 0.04)
+        harris_norm = cv2.normalize(harris_dst, None, 0, 255, cv2.NORM_MINMAX).astype(np.uint8)
+        
+        cv2.cornerSubPix(harris_norm, center_in_roi, (10, 10), (-1, -1), criteria)
+        
+        refined_cx = center_in_roi[0, 0, 0] + offset_x
+        refined_cy = center_in_roi[0, 0, 1] + offset_y
+        
+        max_shift = 3
+        if abs(refined_cx - cx) <= max_shift and abs(refined_cy - cy) <= max_shift:
+            return refined_cx, refined_cy
+        else:
+            return cx, cy
+    except:
         return cx, cy
-
-    return refined_cx, refined_cy
 
 def detect_markers(image_path: str) -> List[Dict]:
     print(f"\nОбработка изображения: {os.path.basename(image_path)}")
@@ -79,7 +93,7 @@ def detect_markers(image_path: str) -> List[Dict]:
     if image is None:
         print("Не удалось загрузить изображение")
         return []
-
+    
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
     binary = advanced_binarization(gray)
 
