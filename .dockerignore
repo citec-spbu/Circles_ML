@@ -1,0 +1,22 @@
+.git
+.gitattributes
+__pycache__
+*.pyc
+*.pyo
+.venv
+venv
+.env
+*.log
+another researches/
+researches/
+*.jpg
+*.jpeg
+*.png
+*.tif
+*.tiff
+*.bmp
+*.npy
+*.npz
+*.pt
+*.pth
+*.onnx
