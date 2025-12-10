@@ -28,7 +28,7 @@ def create_application() -> FastAPI:
     )
 
     # Подключение статических файлов и шаблонов
-    application.mount("/static", StaticFiles(directory="static"), name="static")
+    application.mount("/static", StaticFiles(directory="app/static"), name="static")
 
     # Подключение API роутеров
     application.include_router(api_router, prefix="/api")
@@ -37,7 +37,7 @@ def create_application() -> FastAPI:
     @application.get("/")
     async def root(request: Request):
         """Главная страница с веб-интерфейсом"""
-        templates = Jinja2Templates(directory="templates")
+        templates = Jinja2Templates(directory="app/templates")
         return templates.TemplateResponse("index.html", {"request": request})
 
     @application.get("/health")

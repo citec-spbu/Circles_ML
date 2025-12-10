@@ -2,7 +2,7 @@
     "name": "Blind Marker Detector",
     "version": "1.1.0",
     "class_name": "BlindMarkerDetector",
-    "module_path": "blind_marker_detector",
+    "module_path": "detector",
     "description": "Cлепой детектор круговых меток. Основан на скоринге яркости, формы и локальном уточнении.",
     "optional_parameters": {
         "min_area": 150,

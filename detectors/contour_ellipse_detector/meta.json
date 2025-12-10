@@ -2,7 +2,7 @@
     "name": "Contour Ellipse Detector",
     "version": "1.0.0",
     "class_name": "ContourEllipseDetector",
-    "module_path": "contour_ellipse_detector",
+    "module_path": "detector",
     "description": "Обнаружение белых круговых меток на основе контурного анализа с аппроксимацией эллипсами и субпиксельным уточнением центров",
     "optional_parameters": {
         "min_area": 25,
