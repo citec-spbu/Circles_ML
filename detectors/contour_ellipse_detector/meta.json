@@ -12,6 +12,7 @@
         "refine_centers": true,
         "morph_close_iterations": 2,
         "morph_open_iterations": 1,
-        "max_center_shift": 2
+        "max_center_shift": 2,
+        "normal_estimator": "ellipse"
     }
 }

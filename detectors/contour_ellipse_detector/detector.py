@@ -4,6 +4,117 @@ import math
 from typing import List
 from detectors import BaseDetector, DetectionResult
 
+def estimate_normal_from_spot(img_spot):
+    """Оцениваем нормаль пятна с помощью анализа эллипса"""
+    img_to_thresh = img_spot
+    if img_to_thresh.max() <= 1.0:
+        img_to_thresh = img_to_thresh * 255.0
+    img_to_thresh = np.clip(img_to_thresh, 0, 255).astype(np.uint8)
+    
+    img_smooth = cv2.GaussianBlur(img_to_thresh, (3, 3), 0.8)
+    clahe = cv2.createCLAHE(clipLimit=1.5, tileGridSize=(8, 8))
+    img_enhanced = clahe.apply(img_smooth)
+
+    _, binary_mask = cv2.threshold(
+        img_enhanced, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU
+    )
+    kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2, 2))
+    binary_mask = cv2.morphologyEx(binary_mask, cv2.MORPH_CLOSE, kernel)
+    contours, _ = cv2.findContours(
+        binary_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE
+    )
+    
+    if not contours:
+        return None
+
+    largest_contour = max(contours, key=cv2.contourArea)
+    if cv2.contourArea(largest_contour) < 50:
+        return None
+
+    try:
+        ellipse = cv2.fitEllipse(largest_contour)
+        (center_x, center_y), (axis_a, axis_b), angle_deg = ellipse
+    except cv2.error:
+        return None
+
+    major_axis = max(axis_a, axis_b)
+    minor_axis = min(axis_a, axis_b)
+    if major_axis <= 0:
+        return None
+
+    aspect_ratio = minor_axis / major_axis
+    angle_rad = np.deg2rad(angle_deg)
+    cos_theta = np.clip(aspect_ratio, 0.0, 1.0)
+    theta = np.arccos(cos_theta)
+    phi = angle_rad + np.pi / 2
+
+    nx = np.sin(theta) * np.cos(phi)
+    ny = np.sin(theta) * np.sin(phi)
+    nz = np.cos(theta)
+
+    norm_length = np.sqrt(nx**2 + ny**2 + nz**2)
+    if norm_length > 0:
+        nx /= norm_length
+        ny /= norm_length
+        nz /= norm_length
+        return nx, ny, nz
+    return None
+
+
+def estimate_normal_from_spot_alt(img_spot, num_bins=36):
+    """Оцениваем нормаль пятна с помощью анализа радиального профиля"""
+    img_spot = img_spot.astype(np.float32)
+    if img_spot.max() > 1.0:
+        img_spot /= 255.0
+    
+    h, w = img_spot.shape
+    cy, cx = h // 2, w // 2
+    
+    angles = np.linspace(0, 2 * np.pi, num_bins, endpoint=False)
+    max_radius = min(cx, h - cy, w - cx)
+    if max_radius <= 1:
+        return None
+    
+    profile = np.zeros(num_bins, dtype=np.float32)
+    
+    for i, angle in enumerate(angles):
+        dx = np.cos(angle)
+        dy = np.sin(angle)
+        
+        r = np.arange(0, max_radius, 0.5, dtype=np.float32)
+        x_line = r * dx + cx
+        y_line = r * dy + cy
+        
+        valid = (
+            (x_line >= 0) & (x_line < w) &
+            (y_line >= 0) & (y_line < h)
+        )
+        if np.sum(valid) > 10:
+            profile[i] = np.mean(
+                img_spot[y_line[valid].astype(int),
+                         x_line[valid].astype(int)]
+            )
+
+    if np.all(profile == 0):
+        return None
+
+    fft_profile = np.fft.fft(profile)
+    dominant_angle = np.angle(fft_profile[1])
+
+    profile_norm = profile / (profile.mean() + 1e-8)
+    eccentricity = float(np.std(profile_norm))
+
+    theta = np.deg2rad(15.0 * eccentricity)
+    phi = float(dominant_angle)
+    
+    nx = np.sin(theta) * np.cos(phi)
+    ny = np.sin(theta) * np.sin(phi)
+    nz = np.cos(theta)
+    
+    norm = np.sqrt(nx**2 + ny**2 + nz**2)
+    if norm > 0:
+        return nx / norm, ny / norm, nz / norm
+    return None
 
 class ContourEllipseDetector(BaseDetector):
     """
@@ -21,6 +132,14 @@ class ContourEllipseDetector(BaseDetector):
         self.morph_close_iterations = self.config.get("morph_close_iterations", 2)
         self.morph_open_iterations = self.config.get("morph_open_iterations", 1)
         self.max_center_shift = self.config.get("max_center_shift", 2)
+
+        estimator_name = self.config.get("normal_estimator", "ellipse")
+        if estimator_name == "ellipse":
+            self._normal_estimator = estimate_normal_from_spot
+        elif estimator_name == "radial":
+            self._normal_estimator = estimate_normal_from_spot_alt
+        else:
+            self._normal_estimator = estimate_normal_from_spot
 
     def _advanced_binarization(self, gray: np.ndarray) -> np.ndarray:
         """Улучшенная бинаризация с морфологией"""
@@ -153,13 +272,27 @@ class ContourEllipseDetector(BaseDetector):
                     confidence = self._calculate_confidence(area, circularity, aspect_ratio, len(contour))
                     
                     radius = math.sqrt(area / math.pi)
+
+                    x, y, w, h = cv2.boundingRect(contour)
+                    margin = 10
+                    x0 = max(0, x - margin)
+                    y0 = max(0, y - margin)
+                    x1 = min(gray.shape[1], x + w + margin)
+                    y1 = min(gray.shape[0], y + h + margin)
+                    spot_crop = gray[y0:y1, x0:x1]
+
+                    nn = self._normal_estimator(spot_crop)
+                    if nn is None:
+                        nx, ny, nz = 0.0, 0.0, 1.0
+                    else:
+                        nx, ny, nz = nn
                     
                     results.append(DetectionResult(
                         center_x=float(refined_center[0]),
                         center_y=float(refined_center[1]),
-                        normal_x=0.0,
-                        normal_y=0.0,
-                        normal_z=1.0,
+                        normal_x=float(nx),
+                        normal_y=float(ny),
+                        normal_z=float(nz),
                         radius=float(radius),
                         confidence=confidence
                     ))

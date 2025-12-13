@@ -42,7 +42,7 @@ docker build -t circles-app .
 После успешной сборки образа запустите контейнер с помощью команды:
 
 ```bash
-docker run -rm -p 8000:8000 circles-app
+docker run --rm -p 8000:8000 circles-app
 ```
 
 ## Детекторы
