@@ -15,47 +15,47 @@ def estimate_normal_from_spot(img_spot):
     if img_to_thresh.max() <= 1.0:
         img_to_thresh = img_to_thresh * 255.0
     img_to_thresh = np.clip(img_to_thresh, 0, 255).astype(np.uint8)
-    _, binary_mask = cv2.threshold(img_to_thresh, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-    contours, _ = cv2.findContours(binary_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    
+    img_smooth = cv2.GaussianBlur(img_to_thresh, (3, 3), 0.8)
+    
+    clahe = cv2.createCLAHE(clipLimit=1.5, tileGridSize=(8,8))
+    img_enhanced = clahe.apply(img_smooth)
 
+    _, binary_mask = cv2.threshold(img_enhanced, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+    kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2, 2)) 
+    binary_mask = cv2.morphologyEx(binary_mask, cv2.MORPH_CLOSE, kernel) 
+    contours, _ = cv2.findContours(binary_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+    
     if not contours:
-        return None, None, None
+        return None
 
     largest_contour = max(contours, key=cv2.contourArea)
-
-    if len(largest_contour) < 5:
-        return None, None, None
+    if cv2.contourArea(largest_contour) < 50:
+        return None
 
     try:
         ellipse = cv2.fitEllipse(largest_contour)
         (center_x, center_y), (axis_a, axis_b), angle_deg = ellipse
-    except cv2.error as e:
-        return None, None, None
+    except cv2.error:
+        return None
 
     major_axis = max(axis_a, axis_b)
     minor_axis = min(axis_a, axis_b)
-
     aspect_ratio = minor_axis / major_axis if major_axis > 0 else 0.0
-
     angle_rad = np.deg2rad(angle_deg)
-
     cos_theta = np.clip(aspect_ratio, 0.0, 1.0)
     theta = np.arccos(cos_theta)
     phi = angle_rad + np.pi / 2
-
     nx = np.sin(theta) * np.cos(phi)
     ny = np.sin(theta) * np.sin(phi)
     nz = np.cos(theta)
-
     norm_length = np.sqrt(nx**2 + ny**2 + nz**2)
     if norm_length > 0:
         nx /= norm_length
         ny /= norm_length
         nz /= norm_length
-    else:
-        return 0.0, 0.0, 1.0
-
-    return nx, ny, nz
+        return nx, ny, nz
+    return None
 
 def segment_and_find_regions(image, threshold=60):
     """Сегментация пятен по порогу"""
@@ -225,7 +225,12 @@ class UNetHeatmapDetector(BaseDetector):
             y_pred_img = y_pred_centroid_px + crop_data['minr_crop']
 
             crop_for_normal = crop_data['crop_64_visual']
-            nx, ny, nz = estimate_normal_from_spot(img_spot=crop_for_normal)
+            nn = estimate_normal_from_spot(img_spot=crop_for_normal)
+
+            if nn is None:
+                nx, ny, nz = 0.0, 0.0, 1.0
+            else:
+                nx, ny, nz = nn
 
             confidence = 1.0
 
