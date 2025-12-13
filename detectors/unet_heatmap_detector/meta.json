@@ -8,6 +8,7 @@
         "model_path": "models/unet_heatmap_model.pth",
         "margin": 10,
         "target_crop_size": 64,
-        "segmentation_threshold": 60
+        "segmentation_threshold": 60,
+        "normal_estimator": "ellipse"
     }
 }

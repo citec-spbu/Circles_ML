@@ -57,6 +57,48 @@ def estimate_normal_from_spot(img_spot):
         return nx, ny, nz
     return None
 
+def estimate_normal_from_spot_alt(img_spot, num_bins=36):
+    """Оцениваем нормаль пятна с помощью анализа радиального профиля"""
+    img_spot = img_spot.astype(np.float32)
+    if img_spot.max() > 1.0:
+        img_spot /= 255.0
+    
+    h, w = img_spot.shape
+    cy, cx = h // 2, w // 2
+    
+    angles = np.linspace(0, 2*np.pi, num_bins, endpoint=False)
+    max_radius = min(cx, h-cy, w-cx)
+    
+    profile = np.zeros(num_bins)
+    
+    for i, angle in enumerate(angles):
+        dx = np.cos(angle)
+        dy = np.sin(angle)
+        
+        x_line = np.arange(0, max_radius, 0.5) * dx + cx
+        y_line = np.arange(0, max_radius, 0.5) * dy + cy
+        
+        valid = (x_line >= 0) & (x_line < w) & (y_line >= 0) & (y_line < h)
+        if np.sum(valid) > 10:
+            profile[i] = np.mean(img_spot[y_line[valid].astype(int), 
+                                        x_line[valid].astype(int)])
+
+    fft_profile = np.fft.fft(profile)
+    dominant_angle = np.angle(fft_profile[1])
+
+    profile_norm = profile / (profile.mean() + 1e-8)
+    eccentricity = np.std(profile_norm)
+
+    theta = np.deg2rad(15 * eccentricity)
+    phi = dominant_angle
+    
+    nx = np.sin(theta) * np.cos(phi)
+    ny = np.sin(theta) * np.sin(phi)
+    nz = np.cos(theta)
+    
+    norm = np.sqrt(nx**2 + ny**2 + nz**2)
+    return nx/norm, ny/norm, nz/norm
+
 def segment_and_find_regions(image, threshold=60):
     """Сегментация пятен по порогу"""
     binary_mask = (image > threshold).astype(np.uint8)
@@ -143,6 +185,18 @@ class UNetHeatmapDetector(BaseDetector):
         self.model = None
         self.device = None
         self._model_loaded = False
+        self._normal_estimator = estimate_normal_from_spot
+        self._select_normal_estimator_from_config()
+
+    def _select_normal_estimator_from_config(self):
+        """Выбор функции оценки нормали по config['normal_estimator']"""
+        estimator_name = self.config.get('normal_estimator', 'ellipse')
+        if estimator_name == 'ellipse':
+            self._normal_estimator = estimate_normal_from_spot
+        elif estimator_name == 'radial':
+            self._normal_estimator = estimate_normal_from_spot_alt
+        else:
+            self._normal_estimator = estimate_normal_from_spot
 
     def _ensure_model_loaded(self):
         """Загружаем модель, если еще не загружена"""
@@ -225,7 +279,7 @@ class UNetHeatmapDetector(BaseDetector):
             y_pred_img = y_pred_centroid_px + crop_data['minr_crop']
 
             crop_for_normal = crop_data['crop_64_visual']
-            nn = estimate_normal_from_spot(img_spot=crop_for_normal)
+            nn = self._normal_estimator(img_spot=crop_for_normal)
 
             if nn is None:
                 nx, ny, nz = 0.0, 0.0, 1.0
@@ -249,6 +303,7 @@ class UNetHeatmapDetector(BaseDetector):
     def _on_config_update(self):
         """Перезагрузка модели при изменении конфигурации"""
         self._model_loaded = False
+        self._select_normal_estimator_from_config()
 
     def cleanup(self):
         """Очистка памяти"""
