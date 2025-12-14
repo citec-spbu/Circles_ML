@@ -2,7 +2,7 @@ import cv2
 import numpy as np
 import math
 from typing import List
-from detectors import BaseDetector, DetectionResult
+from .. import BaseDetector, DetectionResult
 
 def estimate_normal_from_spot(img_spot):
     """Оцениваем нормаль пятна с помощью анализа эллипса"""

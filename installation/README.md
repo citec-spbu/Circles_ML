@@ -29,6 +29,51 @@ uvicorn app.main:app --port 8000 --host 0.0.0.0
 
 **Описание:** API для интеграции с другими системами.
 
+**Шаги:**
+1. Установите зависимости:
+```bash
+pip install -r requirements-slim.txt
+```
+
+2. Запустите сервер:
+```bash
+python -m app-slim.main
+```
+
+или
+
+```bash
+uvicorn app-slim.main:app --port 8000 --host 0.0.0.0
+```
+
+**Доступные эндпоинты:**
+- `POST /api/detect` - детекция объектов
+
+**Пример запроса:**
+Изображение отправленное как `form-data` с именем file
+```bash
+curl -X POST http://localhost:8000/api/detect \
+  -F "file=@/путь/к/изображению.jpg" \
+  -H "Content-Type: multipart/form-data"
+```
+
+**Пример ответа:**
+```json
+[
+    {
+        "center_x": 448.5064392089844,
+        "center_y": 487.8146667480469,
+        "normal_x": 0.0,
+        "normal_y": 0.0,
+        "normal_z": 1.0,
+        "radius": 28.476208228154373,
+        "confidence": 0.9644081519750358,
+        "metadata": {}
+    }
+]
+```
+
+
 ## 3. Прямая интеграция Python кода
 
 **Описание:** Встраивание детектора напрямую в ваш Python-код.
