@@ -78,6 +78,31 @@ curl -X POST http://localhost:8000/api/detect \
 
 **Описание:** Встраивание детектора напрямую в ваш Python-код.
 
+**Шаги:**
+1. Из репозитория возьмите пакет `detectors`
+2. Оставьте только:
+   - `__init__.py`
+   - `contour_ellipse_detector`
+
+**Структура:**
+```
+detectors/
+├── __init__.py
+└── contour_ellipse_detector
+```
+
+**Пример использования:**
+```python
+from detectors.contour_ellipse_detector import ContourEllipseDetector
+
+# Инициализация детектора
+detector = ContourEllipseDetector()
+
+# Использование
+results = detector.detect(image)
+```
+
+
 ## 4. Сборка в Docker
 
 **Описание:** Создание Docker-образа для развертывания.
