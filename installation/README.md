@@ -107,6 +107,28 @@ results = detector.detect(image)
 
 **Описание:** Создание Docker-образа для развертывания.
 
+**Шаги:**
+Структура директории:
+```
+./
+├── Dockerfile
+├── app-slim
+├── requirements-slim.txt
+└── detectors/
+   ├── __init__.py
+   └── contour_ellipse_detector
+```
+
+1. Соберите образ:
+```bash
+docker build -t my-detector-app .
+```
+
+2. Запустите контейнер:
+```bash
+docker run -p 8000:8000 my-detector-app
+```
+
 ---
 
 **Примечание:** Выберите способ интеграции, наиболее подходящий для вашего сценария использования.

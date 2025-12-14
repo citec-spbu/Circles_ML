@@ -10,12 +10,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libglib2.0-0 \
     && rm -rf /var/lib/apt/lists/*
 
-COPY requirements.txt .
+COPY requirements-slim.txt .
 
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir -r requirements-slim.txt
 
-COPY . .
+COPY app-slim app-slim
+COPY detectors/contour_ellipse_detector detectors/contour_ellipse_detector
+COPY detectors/__init__.py detectors/__init__.py
 
 EXPOSE 8000
 
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "app-slim.main:app", "--host", "0.0.0.0", "--port", "8000"]
